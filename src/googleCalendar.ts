@@ -209,3 +209,81 @@ export async function getTodayEvents(env: Env): Promise<DailyEvent[]> {
         };
     });
 }
+
+/**
+ * 指定期間内のイベントを取得（重複チェック用）
+ */
+export async function getEventsInRange(
+    startTime: string,
+    endTime: string,
+    env: Env
+): Promise<DailyEvent[]> {
+    const accessToken = await getAccessToken(env);
+
+    const params = new URLSearchParams({
+        timeMin: startTime,
+        timeMax: endTime,
+        singleEvents: 'true',
+        orderBy: 'startTime',
+        timeZone: TIMEZONE,
+    });
+
+    const response = await fetch(
+        `${CALENDAR_API_BASE}/calendars/${encodeURIComponent(env.GOOGLE_CALENDAR_ID)}/events?${params}`,
+        {
+            headers: {
+                Authorization: `Bearer ${accessToken}`,
+            },
+        }
+    );
+
+    if (!response.ok) {
+        const errorText = await response.text();
+        throw new Error(`Failed to get calendar events: ${errorText}`);
+    }
+
+    const data = (await response.json()) as { items: CalendarEvent[] };
+
+    return (data.items || []).map((event) => {
+        let organizer: string | undefined;
+        if (event.description) {
+            const match = event.description.match(/主催:\s*(.+)/);
+            if (match) {
+                organizer = match[1].trim();
+            }
+        }
+
+        return {
+            summary: event.summary,
+            startTime: event.start.dateTime,
+            endTime: event.end.dateTime,
+            organizer,
+        };
+    });
+}
+
+/**
+ * API接続テスト（ステータスチェック用）
+ */
+export async function checkCalendarConnection(env: Env): Promise<{ ok: boolean; error?: string }> {
+    try {
+        const accessToken = await getAccessToken(env);
+
+        const response = await fetch(
+            `${CALENDAR_API_BASE}/calendars/${encodeURIComponent(env.GOOGLE_CALENDAR_ID)}`,
+            {
+                headers: {
+                    Authorization: `Bearer ${accessToken}`,
+                },
+            }
+        );
+
+        if (!response.ok) {
+            return { ok: false, error: `Calendar API: ${response.status}` };
+        }
+
+        return { ok: true };
+    } catch (error) {
+        return { ok: false, error: String(error) };
+    }
+}
