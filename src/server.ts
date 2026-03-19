@@ -37,12 +37,16 @@ async function toWebRequest(request: IncomingMessage): Promise<Request> {
   const body = await readRequestBody(request);
   const host = request.headers.host ?? '127.0.0.1';
   const url = new URL(request.url ?? '/', `http://${host}`);
-
-  return new Request(url, {
+  const init: RequestInit = {
     method: request.method,
     headers,
-    body,
-  });
+  };
+
+  if (body) {
+    init.body = new Uint8Array(body);
+  }
+
+  return new Request(url, init);
 }
 
 async function writeNodeResponse(response: Response, serverResponse: ServerResponse): Promise<void> {
