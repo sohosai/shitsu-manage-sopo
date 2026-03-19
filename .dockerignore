@@ -1,0 +1,12 @@
+node_modules
+dist
+.git
+.gitignore
+.env
+.env.*
+.dev.vars
+.vscode
+.idea
+README.md
+logs
+*.log
