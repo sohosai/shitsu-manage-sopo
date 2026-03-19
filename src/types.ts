@@ -7,8 +7,10 @@ export interface Env {
     SLACK_SIGNING_SECRET: string;
     SLACK_NOTIFICATION_CHANNEL_ID: string;
 
-    // OpenRouter
-    OPENROUTER_API_KEY: string;
+    // OpenAI-compatible LLM provider (default: さくら AI Engine)
+    OPENAI_API_KEY: string;
+    OPENAI_MODEL?: string;
+    OPENAI_BASE_URL?: string;
 
     // Google Calendar
     GOOGLE_CALENDAR_ID: string;

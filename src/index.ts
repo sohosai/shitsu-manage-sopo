@@ -1,7 +1,12 @@
 import { Hono } from 'hono';
 import type { Env, SlackEventPayload, SlackChallengePayload } from './types.js';
 import { verifySlackRequest, sendSlackMessage, formatUserMention } from './slack.js';
-import { analyzeIntent, extractReservationInfo } from './llm.js';
+import {
+  analyzeIntent,
+  extractReservationInfo,
+  checkLLMConnection,
+  LLM_PROVIDER_NAME,
+} from './llm.js';
 import {
   createCalendarEvent,
   deleteCalendarEvent,
@@ -182,24 +187,12 @@ async function handleStatusCheck(
     message: calendarCheck.error,
   });
 
-  try {
-    const response = await fetch('https://openrouter.ai/api/v1/models', {
-      headers: {
-        Authorization: `Bearer ${env.OPENROUTER_API_KEY}`,
-      },
-    });
-    checks.push({
-      name: 'OpenRouter',
-      status: response.ok ? 'ok' : 'error',
-      message: response.ok ? undefined : `Status: ${response.status}`,
-    });
-  } catch (error) {
-    checks.push({
-      name: 'OpenRouter',
-      status: 'error',
-      message: String(error),
-    });
-  }
+  const llmCheck = await checkLLMConnection(env);
+  checks.push({
+    name: LLM_PROVIDER_NAME,
+    status: llmCheck.ok ? 'ok' : 'error',
+    message: llmCheck.error,
+  });
 
   try {
     const response = await fetch('https://slack.com/api/auth.test', {

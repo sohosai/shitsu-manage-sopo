@@ -46,6 +46,11 @@ function requireEnv(name: keyof Env): string {
   return value;
 }
 
+function optionalEnv(name: keyof Env): string | undefined {
+  const value = process.env[name];
+  return value ? value : undefined;
+}
+
 function parsePort(value: string | undefined): number {
   if (!value) {
     return DEFAULT_PORT;
@@ -84,7 +89,9 @@ export function loadRuntimeConfig(): RuntimeConfig {
       SLACK_BOT_TOKEN: requireEnv('SLACK_BOT_TOKEN'),
       SLACK_SIGNING_SECRET: requireEnv('SLACK_SIGNING_SECRET'),
       SLACK_NOTIFICATION_CHANNEL_ID: requireEnv('SLACK_NOTIFICATION_CHANNEL_ID'),
-      OPENROUTER_API_KEY: requireEnv('OPENROUTER_API_KEY'),
+      OPENAI_API_KEY: requireEnv('OPENAI_API_KEY'),
+      OPENAI_MODEL: optionalEnv('OPENAI_MODEL'),
+      OPENAI_BASE_URL: optionalEnv('OPENAI_BASE_URL'),
       GOOGLE_CALENDAR_ID: requireEnv('GOOGLE_CALENDAR_ID'),
       GOOGLE_SERVICE_ACCOUNT_JSON: requireEnv('GOOGLE_SERVICE_ACCOUNT_JSON'),
     },

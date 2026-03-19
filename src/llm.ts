@@ -1,52 +1,105 @@
+import OpenAI from 'openai';
 import type { Env } from './types.js';
 
-const OPENROUTER_API_URL = 'https://openrouter.ai/api/v1/chat/completions';
-const MODEL = 'tngtech/deepseek-r1t2-chimera:free';
+const DEFAULT_OPENAI_BASE_URL = 'https://api.ai.sakura.ad.jp/v1';
+const DEFAULT_OPENAI_MODEL = 'gpt-oss-120b';
 
-interface LLMResponse {
-    choices: Array<{
-        message: {
-            content: string;
-        };
-    }>;
+export const LLM_PROVIDER_NAME = 'さくら AI Engine';
+
+function getOpenAIBaseURL(env: Env): string {
+    return env.OPENAI_BASE_URL ?? DEFAULT_OPENAI_BASE_URL;
+}
+
+function getOpenAIModel(env: Env): string {
+    return env.OPENAI_MODEL ?? DEFAULT_OPENAI_MODEL;
+}
+
+function createOpenAIClient(env: Env): OpenAI {
+    return new OpenAI({
+        apiKey: env.OPENAI_API_KEY,
+        baseURL: getOpenAIBaseURL(env),
+    });
+}
+
+function getErrorStatus(error: unknown): number | undefined {
+    if (typeof error !== 'object' || error === null || !('status' in error)) {
+        return undefined;
+    }
+
+    const status = (error as { status?: unknown }).status;
+    return typeof status === 'number' ? status : undefined;
+}
+
+function getErrorMessage(error: unknown): string {
+    if (error instanceof Error) {
+        return error.message;
+    }
+    return String(error);
+}
+
+function formatLLMError(error: unknown): string {
+    const status = getErrorStatus(error);
+    const message = getErrorMessage(error);
+
+    if (status === 429 || message.toLowerCase().includes('rate limit')) {
+        return `${LLM_PROVIDER_NAME} API rate limit exceeded: リクエスト制限に達したそぽ。しばらく待ってから再度試してほしいそぽ！`;
+    }
+
+    if (status !== undefined) {
+        return `${LLM_PROVIDER_NAME} API error: ${status} - ${message}`;
+    }
+
+    return `${LLM_PROVIDER_NAME} API connection error: ${message}`;
 }
 
 /**
- * OpenRouter APIを呼び出してLLMにリクエストを送る
+ * OpenAI互換のchat completions APIを呼び出してLLMにリクエストを送る
  */
 async function callLLM(
     prompt: string,
     systemPrompt: string,
     env: Env
 ): Promise<string> {
-    const response = await fetch(OPENROUTER_API_URL, {
-        method: 'POST',
-        headers: {
-            'Content-Type': 'application/json',
-            'Authorization': `Bearer ${env.OPENROUTER_API_KEY}`,
-            'X-Title': 'Shitsu Manage Sopo Bot',
-        },
-        body: JSON.stringify({
-            model: MODEL,
+    const client = createOpenAIClient(env);
+
+    try {
+        const response = await client.chat.completions.create({
+            model: getOpenAIModel(env),
             messages: [
                 { role: 'system', content: systemPrompt },
                 { role: 'user', content: prompt },
             ],
             temperature: 0.1,
             max_tokens: 1024,
-        }),
-    });
+        });
 
-    if (!response.ok) {
-        if (response.status === 429) {
-            throw new Error('OpenRouter API rate limit exceeded: リクエスト制限に達したそぽ。しばらく待ってから再度試してほしいそぽ！');
-        }
-        const errorText = await response.text();
-        throw new Error(`OpenRouter API error: ${response.status} - ${errorText}`);
+        return response.choices[0]?.message?.content ?? '';
+    } catch (error) {
+        throw new Error(formatLLMError(error));
     }
+}
 
-    const data = (await response.json()) as LLMResponse;
-    return data.choices[0]?.message?.content ?? '';
+/**
+ * LLM接続テスト（ステータスチェック用）
+ */
+export async function checkLLMConnection(env: Env): Promise<{ ok: boolean; error?: string }> {
+    const client = createOpenAIClient(env);
+
+    try {
+        await client.chat.completions.create({
+            model: getOpenAIModel(env),
+            messages: [
+                { role: 'system', content: 'You are a health check assistant. Reply with OK only.' },
+                { role: 'user', content: 'OK' },
+            ],
+            temperature: 0,
+            max_tokens: 4,
+        });
+
+        return { ok: true };
+    } catch (error) {
+        return { ok: false, error: formatLLMError(error) };
+    }
 }
 
 /**

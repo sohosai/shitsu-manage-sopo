@@ -92,10 +92,11 @@
 4. 作成したサービスアカウントの **鍵** タブでJSONキーを生成・ダウンロード
 5. [Google Calendar](https://calendar.google.com/) で対象カレンダーの共有設定を開き、サービスアカウントのメールアドレス（`xxx@xxx.iam.gserviceaccount.com`）に「予定の変更」権限を付与
 
-### 4. OpenRouterの設定
+### 4. さくらの AI Engine の設定
 
-1. [OpenRouter](https://openrouter.ai/) でアカウント作成
-2. APIキーを取得
+1. さくらの AI Engine で利用したいモデルを確認
+2. アカウントトークンを発行
+3. 必要に応じて接続先URLを確認（通常は既定値のままで動作）
 
 ### 5. 環境変数の設定
 
@@ -107,7 +108,9 @@ ENABLE_DAILY_NOTIFICATION=true
 SLACK_BOT_TOKEN=xoxb-xxxxx
 SLACK_SIGNING_SECRET=xxxxx
 SLACK_NOTIFICATION_CHANNEL_ID=C0XXXXXXXXX
-OPENROUTER_API_KEY=sk-or-xxxxx
+OPENAI_API_KEY=sk-sakura-xxxxx
+OPENAI_MODEL=gpt-oss-120b
+OPENAI_BASE_URL=https://api.ai.sakura.ad.jp/v1
 GOOGLE_CALENDAR_ID=xxxxx@group.calendar.google.com
 GOOGLE_SERVICE_ACCOUNT_JSON={"type":"service_account",...}
 ```
@@ -116,6 +119,8 @@ GOOGLE_SERVICE_ACCOUNT_JSON={"type":"service_account",...}
 > ```bash
 > cat your-service-account.json | jq -c .
 > ```
+> `OPENAI_BASE_URL` は省略可能で、未設定時は `https://api.ai.sakura.ad.jp/v1` を使います。
+> 環境変数名は OpenAI 互換ですが、既定の接続先は さくら AI Engine です。
 
 ### 6. デプロイ
 
@@ -171,7 +176,7 @@ bun run start
 
 - **Runtime**: Bun 1.3 / Docker / Portainer
 - **Framework**: Hono
-- **LLM**: OpenRouter (DeepSeek R1T2 Chimera)
+- **LLM**: さくら AI Engine (OpenAI SDK / Chat Completions)
 - **Calendar**: Google Calendar API
 - **Language**: TypeScript
 
@@ -187,6 +192,6 @@ src/
 ├── scheduler.ts      # 毎朝9:00 JSTの定期通知タイマー
 ├── types.ts          # 型定義
 ├── slack.ts          # Slack API操作（署名検証、メッセージ送信）
-├── llm.ts            # OpenRouter LLM連携（意図解析、情報抽出）
+├── llm.ts            # OpenAI SDK経由のさくら AI Engine連携（意図解析、情報抽出）
 └── googleCalendar.ts # Google Calendar API連携（イベントCRUD）
 ```

@@ -2,12 +2,15 @@ import { extractReservationInfo } from './src/llm.js';
 import * as fs from 'node:fs';
 import * as path from 'node:path';
 import * as dotenv from 'dotenv';
+import type { Env } from './src/types.js';
 
 // .dev.varsを読み込む
 dotenv.config({ path: '.dev.vars' });
 
-const mockEnv = {
-    OPENROUTER_API_KEY: process.env.OPENROUTER_API_KEY || '',
+const mockEnv: Env = {
+    OPENAI_API_KEY: process.env.OPENAI_API_KEY || '',
+    OPENAI_MODEL: process.env.OPENAI_MODEL || 'gpt-oss-120b',
+    OPENAI_BASE_URL: process.env.OPENAI_BASE_URL || undefined,
     SLACK_BOT_TOKEN: '',
     SLACK_SIGNING_SECRET: '',
     SLACK_NOTIFICATION_CHANNEL_ID: '',
@@ -16,8 +19,8 @@ const mockEnv = {
 };
 
 async function runTests() {
-    if (!mockEnv.OPENROUTER_API_KEY) {
-        console.error('Error: OPENROUTER_API_KEY could not be loaded from .dev.vars');
+    if (!mockEnv.OPENAI_API_KEY) {
+        console.error('Error: OPENAI_API_KEY could not be loaded from .dev.vars');
         process.exit(1);
     }
 
@@ -26,7 +29,7 @@ async function runTests() {
     // --- で分割し、空行を除去
     const examples = content.split('---').map(s => s.trim()).filter(s => s.length > 0);
 
-    console.log(`Found ${examples.length} examples to test with model: tngtech/deepseek-r1t2-chimera:free\n`);
+    console.log(`Found ${examples.length} examples to test with model: ${mockEnv.OPENAI_MODEL}\n`);
 
     for (let i = 0; i < examples.length; i++) {
         const example = examples[i];
