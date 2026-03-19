@@ -126,6 +126,7 @@ docker compose up -d --build
 ```
 
 Portainer では `docker-compose.yml` を Stack として読み込み、同じ環境変数を UI から設定してください。
+公開済みイメージを使う場合は `ghcr.io/sohosai/shitsu-manage-sopo:latest` を参照できます。
 
 > **重要:** 毎朝 9:00 JST の定期通知はアプリ内タイマーで実行します。通知の重複を避けるため、Portainer では **1コンテナ固定** で運用してください。
 
@@ -154,6 +155,15 @@ bun run dev
 bun run build
 bun run start
 ```
+
+### Docker Image CD
+
+`main` への push と手動実行で GitHub Actions が GHCR に Docker image を publish します。
+
+- `ghcr.io/sohosai/shitsu-manage-sopo:latest` - `main` の最新 image
+- `ghcr.io/sohosai/shitsu-manage-sopo:sha-<commit>` - コミット単位
+
+初回だけ GitHub の Actions 設定で `GITHUB_TOKEN` に `Read and write permissions` を許可してください。
 
 ---
 
