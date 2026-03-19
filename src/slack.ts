@@ -1,4 +1,4 @@
-import type { Env } from './types';
+import type { Env } from './types.js';
 
 /**
  * Slackリクエストの署名を検証する

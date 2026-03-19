@@ -1,7 +1,7 @@
-import { extractReservationInfo } from './src/llm';
-import fs from 'fs';
-import path from 'path';
-import dotenv from 'dotenv';
+import { extractReservationInfo } from './src/llm.js';
+import * as fs from 'node:fs';
+import * as path from 'node:path';
+import * as dotenv from 'dotenv';
 
 // .dev.varsを読み込む
 dotenv.config({ path: '.dev.vars' });

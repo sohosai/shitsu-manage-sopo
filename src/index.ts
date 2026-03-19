@@ -1,18 +1,16 @@
 import { Hono } from 'hono';
-import type { Env, SlackEventPayload, SlackChallengePayload } from './types';
-import { verifySlackRequest, sendSlackMessage, formatUserMention } from './slack';
-import { analyzeIntent, extractReservationInfo } from './llm';
+import type { Env, SlackEventPayload, SlackChallengePayload } from './types.js';
+import { verifySlackRequest, sendSlackMessage, formatUserMention } from './slack.js';
+import { analyzeIntent, extractReservationInfo } from './llm.js';
 import {
   createCalendarEvent,
   deleteCalendarEvent,
   getTodayEvents,
   getEventsInRange,
   checkCalendarConnection,
-} from './googleCalendar';
+} from './googleCalendar.js';
 import { format, parseISO } from 'date-fns';
 import { toZonedTime } from 'date-fns-tz';
-
-const app = new Hono<{ Bindings: Env }>();
 
 const TIMEZONE = 'Asia/Tokyo';
 
@@ -56,44 +54,40 @@ function formatTodayEvents(events: Awaited<ReturnType<typeof getTodayEvents>>): 
 }
 
 /**
- * ヘルスチェック
+ * HTTPアプリケーションを生成
  */
-app.get('/', (c) => {
-  return c.text('室予約管理Bot そぽ is running!');
-});
+export function createApp(env: Env): Hono {
+  const app = new Hono();
 
-/**
- * Slack Events APIエンドポイント
- */
-app.post('/slack/events', async (c) => {
-  const body = await c.req.text();
+  app.get('/', (c) => {
+    return c.text('室予約管理Bot そぽ is running!');
+  });
 
-  // 署名検証
-  const isValid = await verifySlackRequest(c.req.raw, body, c.env);
-  if (!isValid) {
-    return c.json({ error: 'Invalid signature' }, 401);
-  }
+  app.post('/slack/events', async (c) => {
+    const body = await c.req.text();
 
-  const payload = JSON.parse(body) as SlackEventPayload | SlackChallengePayload;
-
-  // URL検証チャレンジ
-  if (payload.type === 'url_verification') {
-    return c.json({ challenge: (payload as SlackChallengePayload).challenge });
-  }
-
-  // イベント処理
-  if (payload.type === 'event_callback') {
-    const eventPayload = payload as SlackEventPayload;
-    const event = eventPayload.event;
-
-    if (event.type === 'app_mention') {
-      // 3秒ルール対策：即座に200を返す
-      c.executionCtx.waitUntil(handleAppMention(event, c.env));
+    const isValid = await verifySlackRequest(c.req.raw, body, env);
+    if (!isValid) {
+      return c.json({ error: 'Invalid signature' }, 401);
     }
-  }
 
-  return c.json({ ok: true });
-});
+    const payload = JSON.parse(body) as SlackEventPayload | SlackChallengePayload;
+
+    if (payload.type === 'url_verification') {
+      return c.json({ challenge: payload.challenge });
+    }
+
+    if (payload.type === 'event_callback' && payload.event.type === 'app_mention') {
+      void handleAppMention(payload.event, env).catch((error) => {
+        console.error('Background mention handling failed:', error);
+      });
+    }
+
+    return c.json({ ok: true });
+  });
+
+  return app;
+}
 
 /**
  * メンションイベントを処理
@@ -106,7 +100,6 @@ async function handleAppMention(
   const userMention = formatUserMention(user);
 
   try {
-    // 意図を解析
     const intent = await analyzeIntent(text, env);
 
     switch (intent.type) {
@@ -152,7 +145,6 @@ async function handleAppMention(
   } catch (error) {
     console.error('Error handling app mention:', error);
 
-    // 429エラーの場合は専用メッセージ
     const errorMessage = String(error);
     if (errorMessage.includes('429') || errorMessage.includes('rate limit')) {
       await sendSlackMessage(
@@ -183,7 +175,6 @@ async function handleStatusCheck(
 ): Promise<void> {
   const checks: { name: string; status: 'ok' | 'error'; message?: string }[] = [];
 
-  // Google Calendar接続チェック
   const calendarCheck = await checkCalendarConnection(env);
   checks.push({
     name: 'Google Calendar',
@@ -191,7 +182,6 @@ async function handleStatusCheck(
     message: calendarCheck.error,
   });
 
-  // OpenRouter接続チェック（軽量なリクエストを送る）
   try {
     const response = await fetch('https://openrouter.ai/api/v1/models', {
       headers: {
@@ -211,7 +201,6 @@ async function handleStatusCheck(
     });
   }
 
-  // Slack API接続チェック（auth.testを呼ぶ）
   try {
     const response = await fetch('https://slack.com/api/auth.test', {
       headers: {
@@ -283,11 +272,9 @@ async function handleReservation(
     return;
   }
 
-  // 予定の重複チェック
   const existingEvents = await getEventsInRange(info.startTime, info.endTime, env);
 
   if (existingEvents.length > 0) {
-    // 重複がある場合は警告付きで登録
     const conflictList = existingEvents
       .map((e) => `・${e.summary}（${formatTime(e.startTime)}～${formatTime(e.endTime)}）`)
       .join('\n');
@@ -316,17 +303,18 @@ ${conflictList}
 予約は完了しているから、もしキャンセルしたかったら「予約ID: ${eventId} の予定を削除して」と言ってほしいそぽ！`;
 
     await sendSlackMessage(channel, response, env, ts);
-  } else {
-    // 重複がない場合は通常の登録
-    const eventId = await createCalendarEvent(
-      info.purpose,
-      info.organizer,
-      info.startTime,
-      info.endTime,
-      env
-    );
+    return;
+  }
 
-    const response = `${userMention}さん、お疲れ様そぽ！
+  const eventId = await createCalendarEvent(
+    info.purpose,
+    info.organizer,
+    info.startTime,
+    info.endTime,
+    env
+  );
+
+  const response = `${userMention}さん、お疲れ様そぽ！
 室の予約が完了したそぽ！
 目的: ${info.purpose}
 主催: ${info.organizer}
@@ -334,14 +322,13 @@ ${conflictList}
 終了時刻: ${formatDateTime(info.endTime)}
 予約ID: ${eventId}`;
 
-    await sendSlackMessage(channel, response, env, ts);
-  }
+  await sendSlackMessage(channel, response, env, ts);
 }
 
 /**
  * 毎朝の定期通知を生成
  */
-async function sendDailyNotification(env: Env): Promise<void> {
+export async function sendDailyNotification(env: Env): Promise<void> {
   const events = await getTodayEvents(env);
 
   const today = new Date();
@@ -351,25 +338,18 @@ async function sendDailyNotification(env: Env): Promise<void> {
 
   if (events.length === 0) {
     return;
-  } else {
-    const eventsList = events
-      .map((event, index) => {
-        const startTime = formatTime(event.startTime);
-        const endTime = formatTime(event.endTime);
-        const organizer = event.organizer ? `主催: ${event.organizer}` : '(詳細なし)';
-        return `${index + 1}. ${event.summary}\n　時間: ${startTime}～${endTime}\n　${organizer}`;
-      })
-      .join('\n');
-
-    message = `おはようそぽ！\n今日（${todayStr}）の委員会室の予定をお知らせするそぽ！\n${eventsList}\n今日も一日、頑張ろうそぽ～！`;
   }
+
+  const eventsList = events
+    .map((event, index) => {
+      const startTime = formatTime(event.startTime);
+      const endTime = formatTime(event.endTime);
+      const organizer = event.organizer ? `主催: ${event.organizer}` : '(詳細なし)';
+      return `${index + 1}. ${event.summary}\n　時間: ${startTime}～${endTime}\n　${organizer}`;
+    })
+    .join('\n');
+
+  message = `おはようそぽ！\n今日（${todayStr}）の委員会室の予定をお知らせするそぽ！\n${eventsList}\n今日も一日、頑張ろうそぽ～！`;
 
   await sendSlackMessage(env.SLACK_NOTIFICATION_CHANNEL_ID, message, env);
 }
-
-export default {
-  fetch: app.fetch,
-  async scheduled(event: ScheduledEvent, env: Env, ctx: ExecutionContext) {
-    ctx.waitUntil(sendDailyNotification(env));
-  },
-};

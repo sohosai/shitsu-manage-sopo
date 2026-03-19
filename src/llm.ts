@@ -1,4 +1,4 @@
-import type { Env } from './types';
+import type { Env } from './types.js';
 
 const OPENROUTER_API_URL = 'https://openrouter.ai/api/v1/chat/completions';
 const MODEL = 'tngtech/deepseek-r1t2-chimera:free';
@@ -24,7 +24,6 @@ async function callLLM(
         headers: {
             'Content-Type': 'application/json',
             'Authorization': `Bearer ${env.OPENROUTER_API_KEY}`,
-            'HTTP-Referer': 'https://shitsu-manage-sopo.workers.dev',
             'X-Title': 'Shitsu Manage Sopo Bot',
         },
         body: JSON.stringify({

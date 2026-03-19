@@ -1,4 +1,4 @@
-import type { Env, CalendarEvent, DailyEvent } from './types';
+import type { Env, CalendarEvent, DailyEvent } from './types.js';
 import { startOfDay, endOfDay } from 'date-fns';
 import { toZonedTime } from 'date-fns-tz';
 

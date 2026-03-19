@@ -1,22 +1,23 @@
 {
   "compilerOptions": {
     "target": "ESNext",
-    "module": "ESNext",
-    "moduleResolution": "Bundler",
+    "module": "NodeNext",
+    "moduleResolution": "NodeNext",
     "strict": true,
     "skipLibCheck": true,
+    "outDir": "dist",
+    "rootDir": "src",
     "lib": [
-      "ESNext"
+      "ESNext",
+      "DOM"
     ],
     "jsx": "react-jsx",
     "jsxImportSource": "hono/jsx",
     "types": [
-      "@cloudflare/workers-types",
       "node"
     ]
   },
   "include": [
-    "src/**/*",
-    "worker-configuration.d.ts"
+    "src/**/*"
   ]
 }

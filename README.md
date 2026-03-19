@@ -81,7 +81,7 @@
 ### 2. Slack Event Subscriptionsの設定
 
 1. **Event Subscriptions** を有効化
-2. Request URLを設定: `https://your-worker.workers.dev/slack/events`
+2. Request URLを設定: `https://your-host.example.com/slack/events`
 3. **Subscribe to bot events** で `app_mention` を追加
 
 ### 3. Google Calendar APIの設定
@@ -99,9 +99,11 @@
 
 ### 5. 環境変数の設定
 
-#### ローカル開発用（`.dev.vars`ファイル）
+`.env.example` をコピーして `.env` を作成し、値を設定します。
 
 ```
+PORT=3000
+ENABLE_DAILY_NOTIFICATION=true
 SLACK_BOT_TOKEN=xoxb-xxxxx
 SLACK_SIGNING_SECRET=xxxxx
 SLACK_NOTIFICATION_CHANNEL_ID=C0XXXXXXXXX
@@ -115,22 +117,23 @@ GOOGLE_SERVICE_ACCOUNT_JSON={"type":"service_account",...}
 > cat your-service-account.json | jq -c .
 > ```
 
-#### 本番環境用（Cloudflare Workers Secrets）
+### 6. デプロイ
+
+#### Portainer Stack / Docker Compose
 
 ```bash
-npx wrangler secret put SLACK_BOT_TOKEN
-npx wrangler secret put SLACK_SIGNING_SECRET
-npx wrangler secret put SLACK_NOTIFICATION_CHANNEL_ID
-npx wrangler secret put OPENROUTER_API_KEY
-npx wrangler secret put GOOGLE_CALENDAR_ID
-npx wrangler secret put GOOGLE_SERVICE_ACCOUNT_JSON
+docker compose up -d --build
 ```
 
-### 6. デプロイ
+Portainer では `docker-compose.yml` を Stack として読み込み、同じ環境変数を UI から設定してください。
+
+> **重要:** 毎朝 9:00 JST の定期通知はアプリ内タイマーで実行します。通知の重複を避けるため、Portainer では **1コンテナ固定** で運用してください。
+
+#### ローカル開発
 
 ```bash
 npm install
-npm run deploy
+npm run dev
 ```
 
 ---
@@ -143,19 +146,20 @@ npm run deploy
 npm run dev
 ```
 
-`http://localhost:8787` でサーバーが起動します。
+`http://localhost:3000` でサーバーが起動します。
 
-### 型定義の再生成
+### 本番ビルド
 
 ```bash
-npm run cf-typegen
+npm run build
+npm start
 ```
 
 ---
 
 ## 技術スタック
 
-- **Runtime**: Cloudflare Workers
+- **Runtime**: Node.js 22 / Docker / Portainer
 - **Framework**: Hono
 - **LLM**: OpenRouter (DeepSeek R1T2 Chimera)
 - **Calendar**: Google Calendar API
@@ -167,7 +171,10 @@ npm run cf-typegen
 
 ```
 src/
-├── index.ts          # メインエントリーポイント、Slack Events処理
+├── server.ts         # Node HTTPサーバー起動
+├── index.ts          # Honoアプリ生成、Slack Events処理
+├── env.ts            # 環境変数の読込
+├── scheduler.ts      # 毎朝9:00 JSTの定期通知タイマー
 ├── types.ts          # 型定義
 ├── slack.ts          # Slack API操作（署名検証、メッセージ送信）
 ├── llm.ts            # OpenRouter LLM連携（意図解析、情報抽出）
