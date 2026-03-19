@@ -163,22 +163,6 @@ GOOGLE_SERVICE_ACCOUNT_JSON={"type":"service_account",...}
 > `OPENAI_BASE_URL` は省略可能で、未設定時は `https://api.ai.sakura.ad.jp/v1` を使います。
 > 環境変数名は OpenAI 互換ですが、既定の接続先は さくら AI Engine です。
 
-### 6. デプロイ
-
-#### Portainer Stack / Docker Compose
-
-```bash
-docker compose pull
-docker compose up -d
-```
-
-Portainer では `compose.yaml` を Stack として読み込み、同じ環境変数を UI から設定してください。
-公開済みイメージを使う場合は `ghcr.io/sohosai/shitsu-manage-sopo:latest` を参照できます。
-`APP_HOST` は Traefik の Host ルールに使われるので、Slack manifest の `request_url` と同じホスト名を入れてください。
-`portainer-traefik` ネットワークは external network 前提です。Portainer 側で存在している必要があります。
-
-> **重要:** 毎朝 9:00 JST の定期通知はアプリ内タイマーで実行します。通知の重複を避けるため、Portainer では **1コンテナ固定** で運用してください。
-
 #### ローカル開発
 
 ```bash
@@ -205,37 +189,3 @@ bun run build
 bun run start
 ```
 
-### Docker Image CD
-
-`main` への push と手動実行で GitHub Actions が GHCR に Docker image を publish します。
-
-- `ghcr.io/sohosai/shitsu-manage-sopo:latest` - `main` の最新 image
-- `ghcr.io/sohosai/shitsu-manage-sopo:sha-<commit>` - コミット単位
-
-初回だけ GitHub の Actions 設定で `GITHUB_TOKEN` に `Read and write permissions` を許可してください。
-
----
-
-## 技術スタック
-
-- **Runtime**: Bun 1.3 / Docker / Portainer
-- **Framework**: Hono
-- **LLM**: さくら AI Engine (OpenAI SDK / Chat Completions)
-- **Calendar**: Google Calendar API
-- **Language**: TypeScript
-
----
-
-## ファイル構成
-
-```
-src/
-├── server.ts         # HTTPサーバー起動
-├── index.ts          # Honoアプリ生成、Slack Events処理
-├── env.ts            # 環境変数の読込
-├── scheduler.ts      # 毎朝9:00 JSTの定期通知タイマー
-├── types.ts          # 型定義
-├── slack.ts          # Slack API操作（署名検証、メッセージ送信）
-├── llm.ts            # OpenAI SDK経由のさくら AI Engine連携（意図解析、情報抽出）
-└── googleCalendar.ts # Google Calendar API連携（イベントCRUD）
-```
