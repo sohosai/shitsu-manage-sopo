@@ -71,18 +71,58 @@
 
 ### 1. Slack Appの作成
 
-1. [Slack API](https://api.slack.com/apps) で新しいアプリを作成
-2. **OAuth & Permissions** で以下のBot Token Scopesを追加:
-   - `app_mentions:read` - メンションの読み取り
-   - `chat:write` - メッセージの送信
-3. ワークスペースにインストールし、Bot User OAuth Tokenを取得
-4. **Basic Information** からSigning Secretを取得
+1. [Slack API](https://api.slack.com/apps) で `Create New App` を開く
+2. `From manifest` を選び、対象ワークスペースを選択する
+3. 下の manifest JSON の `request_url` を自分の公開 URL に置き換えて貼り付ける
+4. アプリ作成後にワークスペースへインストールし、Bot User OAuth Token を取得する
+5. **Basic Information** から Signing Secret を取得する
+
+#### Slack App Manifest JSON
+
+```json
+{
+  "display_information": {
+    "name": "室管理そぽ",
+    "description": "委員会室の予約を管理するSlack Bot",
+    "background_color": "#2eb67d"
+  },
+  "features": {
+    "bot_user": {
+      "display_name": "室管理そぽ",
+      "always_online": false
+    }
+  },
+  "oauth_config": {
+    "scopes": {
+      "bot": [
+        "app_mentions:read",
+        "chat:write"
+      ]
+    }
+  },
+  "settings": {
+    "event_subscriptions": {
+      "request_url": "https://your-bot.example.com/slack/events",
+      "bot_events": [
+        "app_mention"
+      ]
+    },
+    "org_deploy_enabled": false,
+    "socket_mode_enabled": false,
+    "token_rotation_enabled": false
+  }
+}
+```
+
+`request_url` は `https://<APP_HOST>/slack/events` に置き換えてください。後述の `compose.yaml` の `APP_HOST` と同じ値にそろえると迷いません。Slack 側で Event Subscriptions の保存時に URL 検証が走るので、この時点で公開 URL から到達できる必要があります。
 
 ### 2. Slack Event Subscriptionsの設定
 
-1. **Event Subscriptions** を有効化
-2. Request URLを設定: `https://your-host.example.com/slack/events`
-3. **Subscribe to bot events** で `app_mention` を追加
+manifest を使った場合、この設定は自動で入ります。必要に応じて **Event Subscriptions** で以下を確認してください。
+
+1. **Event Subscriptions** が有効になっている
+2. Request URL が `https://<APP_HOST>/slack/events` になっている
+3. **Subscribe to bot events** に `app_mention` が入っている
 
 ### 3. Google Calendar APIの設定
 
@@ -105,6 +145,7 @@
 ```
 PORT=3000
 ENABLE_DAILY_NOTIFICATION=true
+APP_HOST=your-bot.example.com
 SLACK_BOT_TOKEN=xoxb-xxxxx
 SLACK_SIGNING_SECRET=xxxxx
 SLACK_NOTIFICATION_CHANNEL_ID=C0XXXXXXXXX
@@ -127,11 +168,14 @@ GOOGLE_SERVICE_ACCOUNT_JSON={"type":"service_account",...}
 #### Portainer Stack / Docker Compose
 
 ```bash
-docker compose up -d --build
+docker compose pull
+docker compose up -d
 ```
 
-Portainer では `docker-compose.yml` を Stack として読み込み、同じ環境変数を UI から設定してください。
+Portainer では `compose.yaml` を Stack として読み込み、同じ環境変数を UI から設定してください。
 公開済みイメージを使う場合は `ghcr.io/sohosai/shitsu-manage-sopo:latest` を参照できます。
+`APP_HOST` は Traefik の Host ルールに使われるので、Slack manifest の `request_url` と同じホスト名を入れてください。
+`portainer-traefik` ネットワークは external network 前提です。Portainer 側で存在している必要があります。
 
 > **重要:** 毎朝 9:00 JST の定期通知はアプリ内タイマーで実行します。通知の重複を避けるため、Portainer では **1コンテナ固定** で運用してください。
 
